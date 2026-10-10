@@ -24,13 +24,14 @@ import net.runelite.client.ui.PluginPanel;
 
 class MouseClickGuardPanel extends PluginPanel
 {
+	private static final String LAST_7_DAYS = "Last " + ClickStatistics.HEALTH_WINDOW_DAYS + " days";
+	private static final String LAST_90_DAYS = "Last " + ClickStatistics.RETENTION_DAYS + " days";
 	private static final String SESSION = "This session";
-	private static final String LIFETIME = "Lifetime";
 	private static final int RECENT_SHOWN = 20;
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault());
 	private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE d MMM");
 
-	private final JComboBox<String> period = new JComboBox<>(new String[]{SESSION, LIFETIME});
+	private final JComboBox<String> period = new JComboBox<>(new String[]{LAST_7_DAYS, LAST_90_DAYS, SESSION});
 	private final Map<MouseButton, ButtonSection> sections = new EnumMap<>(MouseButton.class);
 	private final JPanel recent = verticalPanel();
 	private final JPanel daily = new JPanel(new GridLayout(0, 3, 4, 2));
@@ -92,7 +93,7 @@ class MouseClickGuardPanel extends PluginPanel
 		{
 			return;
 		}
-		ButtonPair stats = LIFETIME.equals(period.getSelectedItem()) ? snapshot.getLifetime() : snapshot.getSession();
+		ButtonPair stats = selectedPeriod();
 		for (MouseButton button : MouseButton.values())
 		{
 			sections.get(button).update(stats.get(button), snapshot.getHealth(button), thresholdMs);
@@ -129,6 +130,20 @@ class MouseClickGuardPanel extends PluginPanel
 
 		revalidate();
 		repaint();
+	}
+
+	private ButtonPair selectedPeriod()
+	{
+		Object selected = period.getSelectedItem();
+		if (LAST_90_DAYS.equals(selected))
+		{
+			return snapshot.getLast90Days();
+		}
+		if (SESSION.equals(selected))
+		{
+			return snapshot.getSession();
+		}
+		return snapshot.getLast7Days();
 	}
 
 	private static class ButtonSection extends JPanel

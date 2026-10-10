@@ -27,7 +27,7 @@ public class ClickStatisticsTest
 		assertEquals(1, left.getChatter());
 		assertEquals(1, left.getSuppressed());
 
-		Counts right = stats.snapshot(TODAY).getLifetime().get(MouseButton.RIGHT).getCounts();
+		Counts right = stats.snapshot(TODAY).getLast7Days().get(MouseButton.RIGHT).getCounts();
 		assertEquals(1, right.getPresses());
 		assertEquals(0, right.getSuppressed());
 	}
@@ -63,6 +63,32 @@ public class ClickStatisticsTest
 	}
 
 	@Test
+	public void windowsSumTheirDaysIncludingHistograms()
+	{
+		stats.record(press(MouseButton.LEFT, 15, true, false), TODAY);
+		stats.record(press(MouseButton.LEFT, 15, true, false), TODAY.minusDays(6));
+		stats.record(press(MouseButton.LEFT, 15, true, false), TODAY.minusDays(7));
+		stats.record(press(MouseButton.LEFT, 15, true, false), TODAY.minusDays(89));
+
+		ClickStatistics.Snapshot snapshot = stats.snapshot(TODAY);
+		ButtonStats week = snapshot.getLast7Days().get(MouseButton.LEFT);
+		assertEquals(2, week.getCounts().getPresses());
+		assertEquals(2, week.getHistogram()[1]);
+		assertEquals(4, snapshot.getLast90Days().get(MouseButton.LEFT).getCounts().getChatter());
+	}
+
+	@Test
+	public void legacyLifetimeFieldIsIgnored()
+	{
+		ClickStatistics.Persisted persisted = new com.google.gson.Gson().fromJson(
+			"{\"version\":1,\"lifetime\":{\"left\":{\"counts\":{\"presses\":9}}},\"daily\":{}}",
+			ClickStatistics.Persisted.class);
+		stats.restore(persisted);
+
+		assertEquals(0, stats.snapshot(TODAY).getLast90Days().get(MouseButton.LEFT).getCounts().getPresses());
+	}
+
+	@Test
 	public void daysOlderThanRetentionArePruned()
 	{
 		stats.record(press(MouseButton.LEFT, 100, false, false), TODAY.minusDays(ClickStatistics.RETENTION_DAYS));
@@ -81,7 +107,7 @@ public class ClickStatisticsTest
 		restored.restore(stats.toPersisted());
 
 		ClickStatistics.Snapshot snapshot = restored.snapshot(TODAY);
-		assertEquals(1, snapshot.getLifetime().get(MouseButton.RIGHT).getCounts().getSuppressed());
+		assertEquals(1, snapshot.getLast7Days().get(MouseButton.RIGHT).getCounts().getSuppressed());
 		assertEquals(1, snapshot.getDaily().get(TODAY).get(MouseButton.RIGHT).getCounts().getChatter());
 		assertEquals("session is not persisted", 0, snapshot.getSession().get(MouseButton.RIGHT).getCounts().getPresses());
 	}
@@ -93,7 +119,7 @@ public class ClickStatisticsTest
 		stats.reset();
 
 		ClickStatistics.Snapshot snapshot = stats.snapshot(TODAY);
-		assertEquals(0, snapshot.getLifetime().get(MouseButton.LEFT).getCounts().getPresses());
+		assertEquals(0, snapshot.getLast90Days().get(MouseButton.LEFT).getCounts().getPresses());
 		assertEquals(0, snapshot.getDaily().size());
 		assertEquals(0, snapshot.getRecent().size());
 	}

@@ -18,6 +18,12 @@ class ButtonPair
 		get(event.getButton()).record(event);
 	}
 
+	void add(ButtonPair other)
+	{
+		left.add(other.left);
+		right.add(other.right);
+	}
+
 	ButtonPair copy()
 	{
 		ButtonPair copy = new ButtonPair();

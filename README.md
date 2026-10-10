@@ -12,7 +12,7 @@ mouse is failing, and can optionally discard the phantom second press.
   including prayer flicking, is normally well above 80 ms.
 - **Mouse health** per button — *Healthy*, *Suspect* or *Failing* — based on chatter per 1,000 presses over the
   last 7 days (shown once at least 500 presses have been seen).
-- **Side panel** with a histogram of press intervals (chatter range in red), session and lifetime totals,
+- **Side panel** with a histogram of press intervals (chatter range in red), totals for the last 7 days, the last 90 days or this session,
   recent chatter events and a 90-day daily history.
 - **Chat warnings** (optional): a summary at most once every 5 minutes per button, and a message whenever a
   button's health changes.

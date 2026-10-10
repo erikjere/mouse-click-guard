@@ -33,6 +33,15 @@ class ButtonStats
 		return histogram;
 	}
 
+	void add(ButtonStats other)
+	{
+		counts.add(other.counts);
+		for (int i = 0; i < BINS; i++)
+		{
+			histogram[i] += other.histogram[i];
+		}
+	}
+
 	ButtonStats copy()
 	{
 		ButtonStats copy = new ButtonStats();

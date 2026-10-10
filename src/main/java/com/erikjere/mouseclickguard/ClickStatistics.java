@@ -12,7 +12,7 @@ import java.util.TreeMap;
 import lombok.Value;
 
 /**
- * Session, lifetime and daily statistics for all tracked buttons. Thread-safe: presses are recorded on the AWT
+ * Session and daily statistics for all tracked buttons. Thread-safe: presses are recorded on the AWT
  * event thread while persistence and chat warnings run elsewhere.
  */
 class ClickStatistics
@@ -22,7 +22,6 @@ class ClickStatistics
 	static final int RECENT_EVENTS = 50;
 
 	private ButtonPair session = new ButtonPair();
-	private ButtonPair lifetime = new ButtonPair();
 	private final TreeMap<LocalDate, ButtonPair> daily = new TreeMap<>();
 	/**
 	 * Most recent Chatter presses, newest first.
@@ -33,7 +32,6 @@ class ClickStatistics
 	synchronized void record(PressEvent event, LocalDate today)
 	{
 		session.record(event);
-		lifetime.record(event);
 		daily.computeIfAbsent(today, d -> new ButtonPair()).record(event);
 		if (event.isChatter())
 		{
@@ -53,18 +51,26 @@ class ClickStatistics
 	 */
 	synchronized MouseHealth health(MouseButton button, LocalDate today)
 	{
-		Counts window = new Counts();
-		for (ButtonPair day : daily.subMap(today.minusDays(HEALTH_WINDOW_DAYS - 1), true, today, true).values())
+		Counts counts = window(today, HEALTH_WINDOW_DAYS).get(button).getCounts();
+		return MouseHealth.of(counts.getPresses(), counts.getChatter());
+	}
+
+	/**
+	 * Sum of the last {@code days} days, today included.
+	 */
+	private ButtonPair window(LocalDate today, int days)
+	{
+		ButtonPair sum = new ButtonPair();
+		for (ButtonPair day : daily.subMap(today.minusDays(days - 1), true, today, true).values())
 		{
-			window.add(day.get(button).getCounts());
+			sum.add(day);
 		}
-		return MouseHealth.of(window.getPresses(), window.getChatter());
+		return sum;
 	}
 
 	synchronized void reset()
 	{
 		session = new ButtonPair();
-		lifetime = new ButtonPair();
 		daily.clear();
 		recent.clear();
 		dirty = true;
@@ -76,7 +82,8 @@ class ClickStatistics
 		daily.forEach((date, pair) -> dailyCopy.put(date, pair.copy()));
 		return new Snapshot(
 			session.copy(),
-			lifetime.copy(),
+			window(today, HEALTH_WINDOW_DAYS),
+			window(today, RETENTION_DAYS),
 			Collections.unmodifiableNavigableMap(dailyCopy.descendingMap()),
 			Collections.unmodifiableList(new ArrayList<>(recent)),
 			health(MouseButton.LEFT, today),
@@ -96,15 +103,12 @@ class ClickStatistics
 	synchronized Persisted toPersisted()
 	{
 		Persisted persisted = new Persisted();
-		persisted.lifetime = lifetime.copy();
 		daily.forEach((date, pair) -> persisted.daily.put(date.toString(), pair.copy()));
 		return persisted;
 	}
 
 	synchronized void restore(Persisted persisted)
 	{
-		lifetime = persisted.lifetime == null ? new ButtonPair() : persisted.lifetime;
-		lifetime.normalize();
 		daily.clear();
 		if (persisted.daily != null)
 		{
@@ -129,7 +133,8 @@ class ClickStatistics
 	static class Snapshot
 	{
 		ButtonPair session;
-		ButtonPair lifetime;
+		ButtonPair last7Days;
+		ButtonPair last90Days;
 		/**
 		 * Newest day first.
 		 */
@@ -145,12 +150,12 @@ class ClickStatistics
 	}
 
 	/**
-	 * Stored form. The session is deliberately not persisted.
+	 * Stored form. The session is deliberately not persisted. Version 1 also had an all-time total, which is
+	 * ignored when read.
 	 */
 	static class Persisted
 	{
-		int version = 1;
-		ButtonPair lifetime = new ButtonPair();
+		int version = 2;
 		Map<String, ButtonPair> daily = new TreeMap<>();
 	}
 }
